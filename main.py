@@ -216,9 +216,11 @@ def doMain(firstTopic, study_task=False):
         if topic is None:
             handle_err(-99, '暂未支持该题型，请提交 issue 并附带所有输出信息！')
 
+        delay = random.randrange(2000, 20000)
+
         data = {
             'topic_code': topic,
-            'time_spent': random.randrange(2000, 20000),
+            'time_spent': delay,
             'opt_img_w': '2920',
             'opt_font_size': '162',
             'opt_font_c': '#000000',
@@ -226,10 +228,11 @@ def doMain(firstTopic, study_task=False):
             'it_font_size': '184'
         }
 
+        time.sleep(delay / 1000)
+
         req = apipost(uri, data)
         ret = json.loads(req.content.decode())
         print(Fore.WHITE + 'SUBMIT <== ', ret)
-        time.sleep(random.randrange(1000, 4000) / 1000)
 
         if 'topic_code' in ret['data']:
             topic = ret['data']['topic_code']
