@@ -5,6 +5,7 @@ import random
 import hashlib
 from colorama import Fore, Back, Style, init
 
+# dev
 TOKEN = '***REMOVED***'
 VERSION = 1.3
 
