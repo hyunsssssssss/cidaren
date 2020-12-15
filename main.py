@@ -5,10 +5,10 @@ import random
 import hashlib
 from colorama import Fore, Back, Style, init
 
-TOKEN = '#TOKEN#'
-VERSION = 1.1
+TOKEN = '#Token#'
+VERSION = 1.2
 
-init(convert=True)
+init()
 session = requests.Session()
 requests.packages.urllib3.disable_warnings()
 
@@ -40,15 +40,25 @@ def sign(p):
 
 
 def apipost(uri, pat):
-    pat['timestamp'] = int(time.time() * 1000)
-    pat['versions'] = '1.2.0'
-    return session.post('https://gateway.vocabgo.com' + uri, headers=headers, data=sign(pat), verify=False)
+    while True:
+        try:
+            pat['timestamp'] = int(time.time() * 1000)
+            pat['versions'] = '1.2.0'
+            return session.post('https://gateway.vocabgo.com' + uri, headers=headers, data=sign(pat), verify=False)
+        except ConnectionError:
+            print(Fore.RED, 'apipost:', 'ConnectionError!', 'Retrying...')
+            time.sleep(10)
 
 
 def apiget(uri):
-    return session.get('https://gateway.vocabgo.com' + uri
-                       + '&timestamp=' + str(int(time.time() * 1000))
-                       + '&versions=1.2.0', headers=headers, verify=False)
+    while True:
+        try:
+            return session.get('https://gateway.vocabgo.com' + uri
+                               + '&timestamp=' + str(int(time.time() * 1000))
+                               + '&versions=1.2.0', headers=headers, verify=False)
+        except ConnectionError:
+            print(Fore.RED, 'apiget:', 'ConnectionError!', 'Retrying...')
+            time.sleep(10)
 
 
 # topic_mode = 0
@@ -180,6 +190,11 @@ def getAnswer(topic, study_task=False):
             return ret['data']['answer_corrects']
 
 
+def getProcess(p):
+    num = int(p*20)
+    return '['+'█'*num+' '*(20-num)+']'
+
+
 def submitAnswer(topic, study_task=False):
     answers = getAnswer(topic, study_task=study_task)
     print(Fore.GREEN + '==> Get Answer: ', answers)
@@ -191,7 +206,7 @@ def submitAnswer(topic, study_task=False):
 
         # 1=true 2=false    clean_status=1才能提交
         if ret['data']['answer_result'] == 1 and ret['data']['clean_status'] == 1:
-            print(Fore.GREEN + '==> Submited')
+            # print(Fore.GREEN + '==> Submited')
             return temp_topic
 
     return None
@@ -216,7 +231,7 @@ def doMain(firstTopic, study_task=False):
         if topic is None:
             handle_err(-99, '暂未支持该题型，请提交 issue 并附带所有输出信息！')
 
-        delay = random.randrange(2000, 20000)
+        delay = random.randrange(4000, 20000)
 
         data = {
             'topic_code': topic,
@@ -228,11 +243,15 @@ def doMain(firstTopic, study_task=False):
             'it_font_size': '184'
         }
 
+        print(Fore.GREEN + '[*] Sleeping:', delay)
         time.sleep(delay / 1000)
 
         req = apipost(uri, data)
         ret = json.loads(req.content.decode())
-        print(Fore.WHITE + 'SUBMIT <== ', ret)
+        if 'topic_done_num' in ret['data'] and 'topic_total' in ret['data']:
+            print(Fore.BLUE + 'Process:', getProcess(ret['data']['topic_done_num'] / ret['data']['topic_total']))
+
+        print(Fore.GREEN + 'SUBMIT <==', Fore.WHITE, ret)
 
         if 'topic_code' in ret['data']:
             topic = ret['data']['topic_code']
