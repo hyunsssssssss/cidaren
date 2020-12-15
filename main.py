@@ -6,7 +6,10 @@ import hashlib
 from colorama import Fore, Back, Style, init
 
 # dev
-TOKEN = '***REMOVED***'
+# yun -> 50ad6d79df38dda1d5d52398ee5c0966
+# lei -> 3e953f253116cfe0a16676af3577fdbd
+TOKEN = '3e953f253116cfe0a16676af3577fdbd'
+ERROR_RATE = 20    # 0-100之间 错误概率百分比，设置为 0 可能导致被封号！
 VERSION = 1.3
 
 init()
@@ -46,8 +49,8 @@ def apipost(uri, pat):
             pat['timestamp'] = int(time.time() * 1000)
             pat['versions'] = '1.2.0'
             return session.post('https://gateway.vocabgo.com' + uri, headers=headers, data=sign(pat), verify=False)
-        except ConnectionError:
-            print(Fore.RED, 'apipost:', 'ConnectionError!', 'Retrying...')
+        except:
+            print(Fore.RED, 'apipost:', 'Error!', 'Retrying...')
             time.sleep(10)
 
 
@@ -57,8 +60,8 @@ def apiget(uri):
             return session.get('https://gateway.vocabgo.com' + uri
                                + '&timestamp=' + str(int(time.time() * 1000))
                                + '&versions=1.2.0', headers=headers, verify=False)
-        except ConnectionError:
-            print(Fore.RED, 'apiget:', 'ConnectionError!', 'Retrying...')
+        except:
+            print(Fore.RED, 'apiget:', 'Error!', 'Retrying...')
             time.sleep(10)
 
 
@@ -188,7 +191,10 @@ def getAnswer(topic, study_task=False):
         topic = ret['data']['topic_code']
 
         if 'answer_corrects' in ret['data']:
-            return ret['data']['answer_corrects']
+            temp = ret['data']['answer_corrects']
+            if type(temp) == list and len(temp) == 1 and type(temp[0]) == str:
+                return [','.join(temp[0].replace('...', '').split(' '))]
+            return temp
 
 
 def getProcess(n, total):
@@ -196,19 +202,51 @@ def getProcess(n, total):
     return '['+'█'*num+' '*(20-num)+'] ' + str(n) + '/' + str(total)
 
 
+def isError():
+    r = random.randrange(1, 100)
+    if r <= ERROR_RATE:
+        return True
+    return False
+
+
+def getErrAnswer(answer):
+    if type(answer) == list:
+        if type(answer[0]) == str and len(answer) == 1:
+            temp = answer[0].replace('...', '').split(' ')
+            random.shuffle(temp)
+            return ','.join(temp)
+        if type(answer[0]) == int and len(answer) >= 1:
+            return random.randrange(0, max(answer)+5)   # 这里 +5 是为了增大错误概率
+
+    return random.randrange(0, 3)
+
+
 def submitAnswer(topic, study_task=False):
     answers = getAnswer(topic, study_task=study_task)
     print(Fore.GREEN + '==> Get Answer: ', answers)
 
     temp_topic = topic
-    for answer in answers:
-        ret = verifyAnswer(temp_topic, answer, study_task=study_task)
-        temp_topic = ret['data']['topic_code']
 
-        # 1=true 2=false    clean_status=1才能提交
-        if ret['data']['answer_result'] == 1 and ret['data']['clean_status'] == 1:
-            # print(Fore.GREEN + '==> Submited')
-            return temp_topic
+    if isError():
+        while True:
+            errAnswer = getErrAnswer(answers)
+            ret = verifyAnswer(temp_topic, errAnswer, study_task=study_task)
+            temp_topic = ret['data']['topic_code']
+
+            # 1=true 2=false    over_status=1 and clean_status=1才能提交
+            if ret['data']['over_status'] == 1 and ret['data']['clean_status'] == 1:
+                # print(Fore.GREEN + '==> Submited')
+                print(Fore.GREEN + '==> Submit Error Answer:', errAnswer)
+                return temp_topic
+    else:
+        for answer in answers:
+            ret = verifyAnswer(temp_topic, answer, study_task=study_task)
+            temp_topic = ret['data']['topic_code']
+
+            # 1=true 2=false    clean_status=1才能提交
+            if ret['data']['answer_result'] == 1 and ret['data']['clean_status'] == 1:
+                # print(Fore.GREEN + '==> Submited')
+                return temp_topic
 
     return None
 
@@ -232,7 +270,7 @@ def doMain(firstTopic, study_task=False):
         if topic is None:
             handle_err(-99, '暂未支持该题型，请提交 issue 并附带所有输出信息！')
 
-        delay = random.randrange(4000, 20000)
+        delay = random.randrange(800, 12000)
 
         data = {
             'topic_code': topic,
@@ -249,10 +287,14 @@ def doMain(firstTopic, study_task=False):
 
         req = apipost(uri, data)
         ret = json.loads(req.content.decode())
-        if 'topic_done_num' in ret['data'] and 'topic_total' in ret['data']:
-            print(Fore.BLUE + 'Process:', getProcess(ret['data']['topic_done_num'], ret['data']['topic_total']))
 
         print(Fore.GREEN + 'SUBMIT <==', Fore.WHITE, ret)
+
+        if ret['code'] != 1 and ret['code'] != 20001:
+            handle_err(-90, '未知错误！\n', data, '\n', ret)
+
+        if 'topic_done_num' in ret['data'] and 'topic_total' in ret['data']:
+            print(Fore.BLUE + 'Process:', getProcess(ret['data']['topic_done_num'], ret['data']['topic_total']))
 
         if 'topic_code' in ret['data']:
             topic = ret['data']['topic_code']
@@ -261,12 +303,13 @@ def doMain(firstTopic, study_task=False):
         print(Fore.YELLOW + 'DONE!')
         break
 
+
 # grade: 模式 1=快速 2=普通 3=完整
 def doUserTask(course_id, grade):
     for task in getUserTasks(course_id):
         req = apiget('/Student/StudyTask/Info?task_id=-1&course_id=' + course_id + '&list_id=' + task['list_id'])
         ret = json.loads(req.content.decode())
-        print(Fore.YELLOW + '====== Doing User Task:', course_id, '======')
+        print(Fore.YELLOW + '====== Doing User Task:', task['list_id'], '======')
         doMain(getFirstTopic(ret['data']['task_id'], task['task_type'], course_id=course_id, list_id=task['list_id'],
                              grade=grade), study_task=True)
 
