@@ -5,8 +5,8 @@ import random
 import hashlib
 from colorama import Fore, Back, Style, init
 
-TOKEN = '#Token#'
-VERSION = 1.2
+TOKEN = '***REMOVED***'
+VERSION = 1.3
 
 init()
 session = requests.Session()
@@ -190,9 +190,9 @@ def getAnswer(topic, study_task=False):
             return ret['data']['answer_corrects']
 
 
-def getProcess(p):
-    num = int(p*20)
-    return '['+'█'*num+' '*(20-num)+']'
+def getProcess(n, total):
+    num = int(n/total*20)
+    return '['+'█'*num+' '*(20-num)+'] ' + str(n) + '/' + str(total)
 
 
 def submitAnswer(topic, study_task=False):
@@ -249,7 +249,7 @@ def doMain(firstTopic, study_task=False):
         req = apipost(uri, data)
         ret = json.loads(req.content.decode())
         if 'topic_done_num' in ret['data'] and 'topic_total' in ret['data']:
-            print(Fore.BLUE + 'Process:', getProcess(ret['data']['topic_done_num'] / ret['data']['topic_total']))
+            print(Fore.BLUE + 'Process:', getProcess(ret['data']['topic_done_num'], ret['data']['topic_total']))
 
         print(Fore.GREEN + 'SUBMIT <==', Fore.WHITE, ret)
 
