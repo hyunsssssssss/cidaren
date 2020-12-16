@@ -6,8 +6,9 @@ import hashlib
 from colorama import Fore, Back, Style, init
 
 # dev
-# yun -> 50ad6d79df38dda1d5d52398ee5c0966
+# yun -> 5dde2ad936dc00468c55dcb34b64bf80
 # lei -> 3e953f253116cfe0a16676af3577fdbd
+# che -> faf4d921b223f4217b67abb7fc7a2f82
 TOKEN = '3e953f253116cfe0a16676af3577fdbd'
 ERROR_RATE = 20    # 0-100之间 错误概率百分比，设置为 0 可能导致被封号！
 VERSION = 1.3
@@ -44,26 +45,40 @@ def sign(p):
 
 
 def apipost(uri, pat):
-    while True:
-        try:
-            pat['timestamp'] = int(time.time() * 1000)
-            pat['versions'] = '1.2.0'
-            return session.post('https://gateway.vocabgo.com' + uri, headers=headers, data=sign(pat), verify=False)
-        except:
-            print(Fore.RED, 'apipost:', 'Error!', 'Retrying...')
-            time.sleep(10)
+    apioption(uri, 'POST')  # 请求前OPTIONS，模拟真实请求
+
+    try:
+        pat['timestamp'] = int(time.time() * 1000)
+        pat['versions'] = '1.2.0'
+        return session.post('https://gateway.vocabgo.com' + uri, headers=headers, data=sign(pat), verify=False)
+    except:
+        print(Fore.RED, 'apipost:', 'Error!', 'Retrying...')
+        time.sleep(10)
 
 
 def apiget(uri):
-    while True:
-        try:
-            return session.get('https://gateway.vocabgo.com' + uri
-                               + '&timestamp=' + str(int(time.time() * 1000))
-                               + '&versions=1.2.0', headers=headers, verify=False)
-        except:
-            print(Fore.RED, 'apiget:', 'Error!', 'Retrying...')
-            time.sleep(10)
+    apioption(uri, 'GET')  # 请求前OPTIONS，模拟真实请求
 
+    try:
+        return session.get('https://gateway.vocabgo.com' + uri
+                           + '&timestamp=' + str(int(time.time() * 1000))
+                           + '&versions=1.2.0', headers=headers, verify=False)
+    except:
+        print(Fore.RED, 'apiget:', 'Error!', 'Retrying...')
+        time.sleep(10)
+
+
+def apioption(uri, method):
+    temp_headers = headers
+    temp_headers['Access-Control-Request-Method'] = method
+
+    try:
+        return session.options('https://gateway.vocabgo.com' + uri
+                           + '&timestamp=' + str(int(time.time() * 1000))
+                           + '&versions=1.2.0', headers=temp_headers, verify=False)
+    except:
+        print(Fore.RED, 'apioption:', 'Error!', 'Retrying...')
+        time.sleep(10)
 
 # topic_mode = 0
 
@@ -193,7 +208,12 @@ def getAnswer(topic, study_task=False):
         if 'answer_corrects' in ret['data']:
             temp = ret['data']['answer_corrects']
             if type(temp) == list and len(temp) == 1 and type(temp[0]) == str:
-                return [','.join(temp[0].replace('...', '').split(' '))]
+                temp_fix = []
+                for item in temp[0].replace('...', '').replace('…', '').split(' '):
+                    if item != '':
+                        temp_fix.append(item)
+
+                return [','.join(temp_fix)]
             return temp
 
 
@@ -270,7 +290,7 @@ def doMain(firstTopic, study_task=False):
         if topic is None:
             handle_err(-99, '暂未支持该题型，请提交 issue 并附带所有输出信息！')
 
-        delay = random.randrange(800, 12000)
+        delay = random.randrange(800, 6000)
 
         data = {
             'topic_code': topic,
